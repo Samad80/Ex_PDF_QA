@@ -1,5 +1,6 @@
 import gradio as gr
 import os, shutil
+import torch
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -8,17 +9,25 @@ from langchain_community.llms import HuggingFacePipeline
 from langchain_core.prompts import ChatPromptTemplate
 from transformers import pipeline
 
+# Check GPU availability
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"Using device: {device}")
+if torch.cuda.is_available():
+    print(f"GPU: {torch.cuda.get_device_name(0)}")
+    print(f"CUDA Version: {torch.version.cuda}")
 
 CHROMA_PATH = "/content/chroma"
 
 # ---------------- Models ----------------
 embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
+    model_name="sentence-transformers/all-MiniLM-L6-v2",
+    model_kwargs={"device": device}
 )
 
 llm = HuggingFacePipeline.from_model_id(
     model_id="google/flan-t5-base",
     task="text2text-generation",
+    model_kwargs={"device_map": device},
     pipeline_kwargs={"max_new_tokens": 300, "temperature": 0.2},
 )
 
