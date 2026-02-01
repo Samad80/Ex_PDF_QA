@@ -37,4 +37,29 @@ Built using **Gradio, LangChain, ChromaDB, and Hugging Face models**.
    - Persistent storage
 
 5. **LLM**  
-   - `go
+   - `google/flan-t5-base`
+   - Used twice:
+     - Answer generation
+     - Explanation generation
+
+6. **UI**  
+   - Built with **Gradio Blocks**
+   - Simple and interactive interface
+
+---
+
+## 🛠 Tech Stack
+
+- Python
+- Gradio
+- LangChain
+- ChromaDB
+- Hugging Face Transformers
+- PyTorch
+
+---
+
+## 📦 Installation
+
+```bash
+pip install gradio torch transformers langchain langchain-community chromadb sentence-transformers pypdf
