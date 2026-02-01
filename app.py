@@ -16,20 +16,29 @@ if torch.cuda.is_available():
     print(f"GPU: {torch.cuda.get_device_name(0)}")
     print(f"CUDA Version: {torch.version.cuda}")
 
-CHROMA_PATH = "/content/chroma"
+
+CHROMA_PATH = "/data/chroma"
 
 # ---------------- Models ----------------
+
 embeddings = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2",
-    model_kwargs={"device": device}
+    model_kwargs={"device": "cpu"},   # FORCE CPU
+    encode_kwargs={
+        "normalize_embeddings": True  # 🔑 REQUIRED for Chroma scores
+    }
 )
 
-llm = HuggingFacePipeline.from_model_id(
-    model_id="google/flan-t5-base",
-    task="text2text-generation",
-    model_kwargs={"device_map": device},
-    pipeline_kwargs={"max_new_tokens": 300, "temperature": 0.2},
+
+
+pipe = pipeline(
+    "text-generation",
+    model="google/flan-t5-base",
+    device=-1,
 )
+
+llm = HuggingFacePipeline(pipeline=pipe)
+
 
 ANSWER_PROMPT = """
 Answer the question using ONLY the context below.
@@ -56,39 +65,35 @@ Give a short explanation.
 db = None  # vector DB (created after upload)
 
 # ---------------- Functions ----------------
+
 def index_pdf(pdf_file):
     global db
 
     if pdf_file is None:
         return "❌ No PDF uploaded."
 
-    # Clear old DB
-    if os.path.exists(CHROMA_PATH):
-        shutil.rmtree(CHROMA_PATH)
+    pdf_path = pdf_file if isinstance(pdf_file, str) else pdf_file.name
 
-    # Gradio gives a FILE PATH (new versions)
-    pdf_path = pdf_file
-
-    # Load PDF
     loader = PyPDFLoader(pdf_path)
     documents = loader.load()
 
-    # Split
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=500,
         chunk_overlap=150,
     )
     chunks = splitter.split_documents(documents)
 
-    # Create DB
     db = Chroma.from_documents(
         documents=chunks,
         embedding=embeddings,
         persist_directory=CHROMA_PATH,
     )
-    db.persist()
 
     return f"✅ Indexed PDF successfully ({len(chunks)} chunks)"
+
+
+
+
 
 
 def ask_question(question):
@@ -140,15 +145,21 @@ with gr.Blocks() as ui:
         outputs=status,
     )
 
-    question = gr.Textbox(label="Ask a question",submit_btn="ASK")
-    answer = gr.Textbox(label="📘 Answer")
-    explanation = gr.Textbox(label="🧠 Why this answer?")
-    sources = gr.Textbox(label="📄 Sources")
 
-    question.submit(
-        fn=ask_question,
-        inputs=question,
-        outputs=[answer, explanation, sources],
+
+    question_input = gr.Textbox(label="Ask a question")
+    ask_btn = gr.Button("ASK")
+
+    answer_output = gr.Textbox(label="📘 Answer")
+    explanation_output = gr.Textbox(label="🧠 Why this answer?")
+    sources_output = gr.Textbox(label="📄 Sources")
+
+    
+    ask_btn.click(
+    fn=ask_question,
+    inputs=question_input,
+    outputs=[answer_output, explanation_output, sources_output]
     )
+
 
 ui.launch(share=True)
